@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kakatua-9 — Island Hopper Bush Pilot</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1433; font-family: system-ui, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; z-index: 5; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  .hud-top { position: absolute; top: 12px; left: 14px; display: flex; gap: 18px; font-size: 20px; font-weight: 700; }
+  .hud-top small { display: block; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #ffd166; }
+  .hud-right { position: absolute; top: 12px; right: 14px; text-align: right; font-size: 18px; font-weight: 700; }
+  .hud-right small { display: block; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #ffd166; }
+  .bar { width: 150px; height: 8px; background: rgba(0,0,0,.45); border-radius: 4px; margin-top: 4px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 4px; }
+  #hud-mission { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 17px; font-weight: 700; background: rgba(10,14,28,.55); padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(255,209,102,.6); white-space: nowrap; }
+  #hud-message { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); font-size: 19px; font-weight: 700; background: rgba(10,14,28,.6); padding: 8px 18px; border-radius: 10px; white-space: nowrap; }
+  #hud-help { position: absolute; bottom: 12px; left: 14px; font-size: 13px; color: #ffe9c9; background: rgba(10,14,28,.45); padding: 6px 10px; border-radius: 8px; }
+  #cockpit { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: 560px; height: 250px; display: none; z-index: 6; pointer-events: none; }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; background: linear-gradient(180deg, rgba(26,20,51,.55), rgba(255,140,90,.35)); }
+  .card { background: rgba(12,16,34,.88); border: 2px solid #ffd166; border-radius: 18px; padding: 28px 34px; max-width: 620px; color: #fff; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+  .card h1 { margin: 0 0 4px; font-size: 42px; color: #ffd166; letter-spacing: .02em; }
+  .card h2 { margin: 0 0 14px; font-size: 19px; font-weight: 600; color: #9fd8e8; }
+  .card p { font-size: 15px; line-height: 1.5; color: #e8e2d8; }
+  .missions { display: flex; gap: 10px; margin: 18px 0 10px; }
+  .missions button { flex: 1; pointer-events: auto; cursor: pointer; background: #e85d3d; color: #fff; border: none; border-radius: 12px; padding: 12px 8px; font-size: 15px; font-weight: 700; }
+  .missions button:hover { background: #ff7a55; }
+  .missions button small { display: block; font-weight: 400; font-size: 12px; margin-top: 4px; color: #ffe9c9; }
+  .keys { font-size: 13px; color: #c9c2b8; line-height: 1.7; }
+  .keys b { color: #ffd166; }
+  #menu-sound { pointer-events: auto; cursor: pointer; margin-top: 12px; background: transparent; color: #9fd8e8; border: 1px solid #9fd8e8; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+  #over { display: none; }
+  #over-restart { pointer-events: auto; cursor: pointer; background: #37c978; color: #06210f; border: none; border-radius: 12px; padding: 12px 26px; font-size: 16px; font-weight: 700; margin-top: 14px; }
+</style>
+</head>
+<body data-screen="menu">
+<canvas id="game" aria-label="Kakatua-9: fly the bush plane through rings, drop cargo and rescue the ranger across tropical islands"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+<canvas id="cockpit" width="560" height="250" aria-hidden="true"></canvas>
+<div id="hud">
+  <div class="hud-top">
+    <div><small>ALTITUDE</small><span id="hud-alt">0 ft</span></div>
+    <div><small>SPEED</small><span id="hud-speed">0 kt</span></div>
+    <div><small>HEADING</small><span id="hud-heading">000°</span></div>
+    <div><small>THROTTLE</small><span id="hud-throttle">0%</span><div class="bar"><div id="hud-thrbar" style="width:0%;background:#4fc3f7"></div></div></div>
+  </div>
+  <div class="hud-right">
+    <div><small>FUEL</small><span id="hud-fuel">100%</span><div class="bar"><div id="hud-fuelbar" style="width:100%;background:#37c978"></div></div></div>
+    <div style="margin-top:6px"><small>DAMAGE</small><span id="hud-damage">0%</span><div class="bar"><div id="hud-dmgbar" style="width:0%;background:#e83a3a"></div></div></div>
+    <div style="margin-top:6px"><small>SCORE</small><span id="hud-score">0</span> &nbsp; <small>TIME</small> <span id="hud-timer">00:00</span></div>
+  </div>
+  <div id="hud-mission">Pick a mission — press 1, 2 or 3</div>
+  <div id="hud-message"></div>
+  <div id="hud-help">W/S throttle &nbsp;·&nbsp; Arrows pitch &amp; roll &nbsp;·&nbsp; A/D yaw &nbsp;·&nbsp; F flaps &nbsp;·&nbsp; C camera &nbsp;·&nbsp; SPACE drop cargo &nbsp;·&nbsp; P pause &nbsp;·&nbsp; R restart</div>
+</div>
+<div id="menu" class="overlay">
+  <div class="card">
+    <h1>KAKATUA-9</h1>
+    <h2>Island Hopper Bush Pilot</h2>
+    <p>Sunset over the islands. You fly the little coral bush plane Kakatua-9 out of the grass strip on Pulau Kakatua — through glowing rings, over the volcano, past the lighthouse, and home again. Watch your fuel, land gently, and the islands are yours.</p>
+    <div class="missions">
+      <button data-mission="rings">1 · Ring Course<small>8 rings, beat the clock</small></button>
+      <button data-mission="cargo">2 · Cargo Drop<small>drop the crate on target</small></button>
+      <button data-mission="rescue">3 · Island Rescue<small>ferry the ranger home</small></button>
+    </div>
+    <p class="keys"><b>W/S</b> throttle &nbsp; <b>↑/↓</b> pitch &nbsp; <b>←/→</b> roll &nbsp; <b>A/D</b> yaw &nbsp; <b>F</b> flaps &nbsp; <b>C</b> cockpit view &nbsp; <b>SPACE</b> drop cargo &nbsp; <b>P</b> pause &nbsp; <b>R</b> restart<br>Mouse steers too. Lift off past 45 kt — below 24 kt the wings give up.</p>
+    <button id="menu-sound">Sound: on</button>
+  </div>
+</div>
+<div id="over" class="overlay">
+  <div class="card">
+    <h1 id="over-title">Crashed!</h1>
+    <p id="over-body"></p>
+    <p id="over-score" style="font-weight:700;color:#ffd166"></p>
+    <button id="over-restart">Back to the menu</button>
+  </div>
+</div>
+<script src="./vendor/three.min.js"></script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
